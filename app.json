@@ -1,0 +1,33 @@
+{
+  "name": "sunrise-bot",
+  "description": "季節を感じるためのchatbot",
+  "repository": "https://github.com/hakatashi/sunrise-bot",
+  "logo": "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/146/sunrise-over-mountains_1f304.png",
+  "keywords": ["sunrise", "chatbot", "slackbot", "slack", "weather", "日の出", "天気", "季節"],
+  "env": {
+    "SLACK_WEBHOOK": {
+      "description": "Your Slack Webhook URL.",
+      "value": "https://hooks.slack.com/services/XXXXXXXXX/XXXXXXXXX/xxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "CLOUDINARY_URL": {
+      "description": "Your cloudinary API endpoint URL.",
+      "value": "cloudinary://000000000000000:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/"
+    },
+    "ACCUWEATHER_KEY": {
+      "description": "Your AccuWeather API key.",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "POST_MODE": {
+      "description": "Weather this slackbot runs sunrise mode or immediate mode.",
+      "value": "now|sunrise"
+    },
+    "SUNRISE_SPOT": {
+      "description": "The location lng,lat to calculate time of sunrise and sunset.",
+      "value": "35.659,139.685"
+    }
+  },
+  "addons": [
+    "heroku-redis",
+    "scheduler"
+  ]
+}
