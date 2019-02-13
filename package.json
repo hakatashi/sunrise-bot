@@ -1,5 +1,6 @@
 {
   "name": "sunrise-bot",
+  "private": true,
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -12,7 +13,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/hakatashi/sunrise-bot/issues"
   },
@@ -23,6 +24,7 @@
     "cheerio": "^1.0.0-rc.2",
     "cloudinary": "^1.13.2",
     "common-tags": "^1.8.0",
+    "dotenv": "^6.2.0",
     "download": "^7.1.0",
     "iconv-lite": "^0.4.24",
     "lodash": "^4.17.11",
