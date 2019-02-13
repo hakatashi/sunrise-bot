@@ -4,24 +4,37 @@ const path = require('path');
 const qs = require('querystring');
 const assert = require('assert');
 const suncalc = require('suncalc');
-const nodePersist = require('node-persist');
 const Queue = require('p-queue');
 const moment = require('moment');
 const {stripIndent} = require('common-tags');
 const cloudinary = require('cloudinary');
 const axios = require('axios');
-const {get, maxBy, flatten, sortBy} = require('lodash');
+const {get, maxBy, flatten, sortBy, range} = require('lodash');
 const scrapeIt = require('scrape-it');
 const iconv = require('iconv-lite');
 const cheerio = require('cheerio');
+const Redis = require('ioredis');
 
 const render = require('./render.js');
 const weathers = require('./weathers.js');
 
+const redis = new Redis(process.env.REDIS_URL);
+
+const getStorage = async (key, defaultValue = undefined) => {
+	const data = await redis.get(key);
+	if (data === null) {
+		return defaultValue;
+	}
+	return JSON.parse(data);
+};
+const setStorage = (key, value) => (
+	redis.set(key, JSON.stringify(value))
+);
+
 const queue = new Queue({concurrency: 1});
 
-const position = process.env.SUNRISE_SPOT.split(',').map((token) => parseFloat(token)).slice(0, 2);
-if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
+const location = process.env.SUNRISE_SPOT.split(',').map((token) => parseFloat(token)).slice(0, 2);
+if (!Number.isFinite(location[0]) || !Number.isFinite(location[1])) {
 	throw new Error(`SUNRISE_SPOT ${JSON.stringify(process.env.SUNRISE_SPOT)} is invalid.`);
 }
 
@@ -187,16 +200,11 @@ const getHaiku = async () => {
 };
 
 const execute = async () => {
-	const storage = nodePersist.create({
-		dir: path.resolve(__dirname, '__state__'),
-	});
-	await storage.init();
-
 	const now = new Date();
 	const today = moment().utcOffset(9).startOf('day').add(12, 'hour').toDate();
-	const {sunrise, sunset} = suncalc.getTimes(today, ...position);
-	const {rise: moonrise, set: moonset} = suncalc.getMoonTimes(today, ...position);
-	const {phase: moonphase} = suncalc.getMoonIllumination(now, ...position);
+	const {sunrise, sunset} = suncalc.getTimes(today, ...location);
+	const {rise: moonrise, set: moonset} = suncalc.getMoonTimes(today, ...location);
+	const {phase: moonphase} = suncalc.getMoonIllumination(now, ...location);
 	const moonEmoji = moonEmojis[Math.round(moonphase * 8) % 8];
 
 	console.log('Fetching weather forecast from AccuWeather...');
@@ -206,8 +214,8 @@ const execute = async () => {
 	})}`);
 	const forecast = data.DailyForecasts.find((cast) => new Date(cast.Date) >= moment().utcOffset(9).startOf('day').toDate());
 
-	const lastWeather = await storage.getItem('lastWeather') || null;
-	const weatherHistories = await storage.getItem('weatherHistories') || [];
+	const lastWeather = await getStorage('lastWeather', null);
+	const weatherHistories = await getStorage('weatherHistories', []);
 
 	const month = moment().utcOffset(9).month() + 1;
 	const date = moment().utcOffset(9).date();
@@ -386,8 +394,8 @@ const execute = async () => {
 		return score;
 	});
 
-	await storage.setItem('lastWeather', {weatherId, temperature});
-	await storage.setItem('weatherHistories', [
+	await setStorage('lastWeather', {weatherId, temperature});
+	await setStorage('weatherHistories', [
 		{date: Date.now(), weather: matchingWeather},
 		...weatherHistories,
 	]);
@@ -406,7 +414,7 @@ const execute = async () => {
 			.end(imageData);
 	});
 
-	const lastEntryUrl = await storage.getItem('lastEntryUrl');
+	const lastEntryUrl = await getStorage('lastEntryUrl');
 
 	console.log('Fetching season articles...');
 	const [tayori, saijiki, tenkijp] = await getEntries();
@@ -417,16 +425,28 @@ const execute = async () => {
 			title: tayori[0].title,
 			link: tayori[0].link,
 		};
+		await setStorage('lastEntryUrl', {
+			...(lastEntryUrl || {}),
+			tayori: tayori[0].link,
+		});
 	} else if (lastEntryUrl.saijiki !== saijiki[0].link) {
 		entry = {
 			title: `${saijiki[0].category}「${saijiki[0].title}」`,
 			link: saijiki[0].link,
 		};
+		await setStorage('lastEntryUrl', {
+			...(lastEntryUrl || {}),
+			saijiki: saijiki[0].link,
+		});
 	} else if (lastEntryUrl.tenkijp !== tenkijp[0].link) {
 		entry = {
 			title: tenkijp[0].title,
 			link: tenkijp[0].link,
 		};
+		await setStorage('lastEntryUrl', {
+			...(lastEntryUrl || {}),
+			tenkijp: tenkijp[0].link,
+		});
 	}
 
 	console.log('Fetching today\'s haiku...');
@@ -448,24 +468,20 @@ const execute = async () => {
 				:sunrise_over_mountains: *日の出* ${moment(sunrise).format('HH:mm')} ～ *日の入* ${moment(sunset).format('HH:mm')}
 				${moonEmoji} *月の出* ${moment(moonrise).format('HH:mm')} ～ *月の入* ${moment(moonset).format('HH:mm')}
 			`,
-		}, ...(entry ? [{
-			color: '#4DB6AC',
-			title: entry.title,
-			title_link: entry.link,
-		}] : []), {
+		}, {
 			color: '#6D4C41',
 			title: '本日の一句',
 			title_link: 'http://sendan.kaisya.co.jp/',
 			text: haiku.text,
 			footer: haiku.author,
-		}],
+		}, ...(entry ? [{
+			color: '#4DB6AC',
+			title: entry.title,
+			title_link: entry.link,
+		}] : [])],
 	});
 
-	await storage.setItem('lastEntryUrl', {
-		tayori: tayori[0].link,
-		saijiki: saijiki[0].link,
-		tenkijp: tenkijp[0].link,
-	});
+	await redis.quit();
 };
 
 module.exports = async () => {
@@ -474,19 +490,24 @@ module.exports = async () => {
 		return;
 	}
 
-	const tick = async () => {
-		const lastSunrise = await storage.getItem('lastSunrise') || moment().subtract(1, 'day');
-		const now = new Date();
-		const tomorrow = moment(lastSunrise).utcOffset(9).endOf('day').add(12, 'hour').toDate();
-		const {sunrise} = suncalc.getTimes(tomorrow, ...position);
+	const sunrises = range(-5, 5).map((days) => suncalc.getTimes(moment().add(days, 'day').toDate(), ...location).sunrise);
+	const nextSunrise = sunrises.find((sunrise) => sunrise > new Date());
+	console.log(`Waiting for next sunrise: ${nextSunrise}`);
 
-		if (sunrise <= now) {
-			await execute();
-		}
-	};
+	await new Promise((resolve) => {
+		const tick = async () => {
+			const now = new Date();
 
-	queue.add(tick);
-	setInterval(() => {
+			if (nextSunrise <= now) {
+				await execute();
+				clearInterval(interval);
+				resolve();
+			}
+		};
+
 		queue.add(tick);
-	}, 10 * 1000);
+		const interval = setInterval(() => {
+			queue.add(tick);
+		}, 10 * 1000);
+	});
 };
