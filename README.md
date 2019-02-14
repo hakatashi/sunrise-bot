@@ -16,13 +16,13 @@
 
 ### 例
 
-![](https://res.cloudinary.com/hakatashi/image/upload/v1549652164/b0ksbirusvqylb2fkltf.png)
+![](https://res.cloudinary.com/hakatashi/image/upload/h_160/v1549652164/b0ksbirusvqylb2fkltf.png)
 
-![](https://res.cloudinary.com/hakatashi/image/upload/v1549652046/belrugebt5rns6oqumh4.png)
+![](https://res.cloudinary.com/hakatashi/image/upload/h_160/v1549652046/belrugebt5rns6oqumh4.png)
 
-![](https://res.cloudinary.com/hakatashi/image/upload/v1549702839/jvd54909bmjlstxmioai.png)
+![](https://res.cloudinary.com/hakatashi/image/upload/h_160/v1549702839/jvd54909bmjlstxmioai.png)
 
-![](https://res.cloudinary.com/hakatashi/image/upload/v1550072245/g6liq7dvq7ua3nk1oisd.png)
+![](https://res.cloudinary.com/hakatashi/image/upload/h_160/v1550072245/g6liq7dvq7ua3nk1oisd.png)
 
 ## 本日のこよみ
 
