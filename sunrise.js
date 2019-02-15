@@ -18,19 +18,6 @@ const Redis = require('ioredis');
 const render = require('./render.js');
 const weathers = require('./weathers.js');
 
-const redis = new Redis(process.env.REDIS_URL);
-
-const getStorage = async (key, defaultValue = undefined) => {
-	const data = await redis.get(key);
-	if (data === null) {
-		return defaultValue;
-	}
-	return JSON.parse(data);
-};
-const setStorage = (key, value) => (
-	redis.set(key, JSON.stringify(value))
-);
-
 const queue = new Queue({concurrency: 1});
 
 const location = process.env.SUNRISE_SPOT.split(',').map((token) => parseFloat(token)).slice(0, 2);
@@ -200,6 +187,19 @@ const getHaiku = async () => {
 };
 
 const execute = async () => {
+	const redis = new Redis(process.env.REDIS_URL);
+
+	const getStorage = async (key, defaultValue = undefined) => {
+		const data = await redis.get(key);
+		if (data === null) {
+			return defaultValue;
+		}
+		return JSON.parse(data);
+	};
+	const setStorage = (key, value) => (
+		redis.set(key, JSON.stringify(value))
+	);
+
 	const now = new Date();
 	const today = moment().utcOffset(9).startOf('day').add(12, 'hour').toDate();
 	const {sunrise, sunset} = suncalc.getTimes(today, ...location);
@@ -465,8 +465,8 @@ const execute = async () => {
 			color: '#1976D2',
 			title: '本日のこよみ',
 			text: stripIndent`
-				:sunrise_over_mountains: *日の出* ${moment(sunrise).format('HH:mm')} ～ *日の入* ${moment(sunset).format('HH:mm')}
-				${moonEmoji} *月の出* ${moment(moonrise).format('HH:mm')} ～ *月の入* ${moment(moonset).format('HH:mm')}
+				:sunrise_over_mountains: *日の出* ${moment(sunrise).utcOffset(9).format('HH:mm')} ～ *日の入* ${moment(sunset).utcOffset(9).format('HH:mm')}
+				${moonEmoji} *月の出* ${moment(moonrise).utcOffset(9).format('HH:mm')} ～ *月の入* ${moment(moonset).utcOffset(9).format('HH:mm')}
 			`,
 		}, {
 			color: '#6D4C41',
@@ -495,12 +495,15 @@ module.exports = async () => {
 	console.log(`Waiting for next sunrise: ${nextSunrise}`);
 
 	await new Promise((resolve) => {
+		let done = false;
+
 		const tick = async () => {
 			const now = new Date();
 
-			if (nextSunrise <= now) {
-				await execute();
+			if (!done && nextSunrise <= now) {
+				done = true;
 				clearInterval(interval);
+				await execute();
 				resolve();
 			}
 		};
