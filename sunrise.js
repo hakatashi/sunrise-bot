@@ -164,7 +164,10 @@ const getTenkijpEntries = async () => {
 		},
 	});
 
-	return data.articles;
+	return data.articles.map(({title, link}) => ({
+		title,
+		link: new URL(link, 'https://tenki.jp/').href,
+	}));
 };
 
 const getEntries = () => (
@@ -207,12 +210,20 @@ const execute = async () => {
 	const {phase: moonphase} = suncalc.getMoonIllumination(now, ...location);
 	const moonEmoji = moonEmojis[Math.round(moonphase * 8) % 8];
 
+	console.log('Fetching location ID from AccuWeather...');
+	const {data: locationData} = await axios.get(`http://dataservice.accuweather.com/locations/v1/cities/geoposition/search?${qs.encode({
+		apikey: process.env.ACCUWEATHER_KEY,
+		q: location.join(','),
+		details: 'true',
+	})}`);
+	const locationId = locationData.Key;
+
 	console.log('Fetching weather forecast from AccuWeather...');
-	const {data} = await axios.get(`http://dataservice.accuweather.com/forecasts/v1/daily/5day/226396?${qs.encode({
+	const {data: weatherData} = await axios.get(`http://dataservice.accuweather.com/forecasts/v1/daily/5day/${locationId}?${qs.encode({
 		apikey: process.env.ACCUWEATHER_KEY,
 		details: 'true',
 	})}`);
-	const forecast = data.DailyForecasts.find((cast) => new Date(cast.Date) >= moment().utcOffset(9).startOf('day').toDate());
+	const forecast = weatherData.DailyForecasts.find((cast) => new Date(cast.Date) >= moment().utcOffset(9).startOf('day').toDate());
 
 	const lastWeather = await getStorage('lastWeather', null);
 	const weatherHistories = await getStorage('weatherHistories', []);
@@ -458,7 +469,7 @@ const execute = async () => {
 		attachments: [{
 			color: '#FFA726',
 			title: `本日の天気${weatherEmojis[weatherId]}「${matchingWeather.name}」`,
-			title_link: 'https://www.accuweather.com/ja/jp/tokyo/226396/daily-weather-forecast/226396',
+			title_link: `https://www.accuweather.com/ja/jp/tokyo/${locationId}/daily-weather-forecast/${locationId}`,
 			image_url: cloudinaryData.secure_url,
 			fallback: matchingWeather.name,
 		}, {
