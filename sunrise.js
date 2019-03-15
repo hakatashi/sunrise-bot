@@ -181,6 +181,10 @@ const getEntries = () => (
 const getHaiku = async () => {
 	const {data} = await axios.get('http://sendan.kaisya.co.jp/index3.html', {
 		responseType: 'arraybuffer',
+		proxy: {
+			host: '54.92.2.147',
+			port: 8082,
+		},
 	});
 	const $ = cheerio.load(iconv.decode(data, 'sjis'));
 	const text = $('td[rowspan=7][width=590] center font').text();
